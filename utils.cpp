@@ -17,6 +17,22 @@ std::vector<std::string> split_string(const std::string& str, char delimiter){
     return result;
 }
 
+std::vector<std::string> split_string_keep_empty(const std::string& str, char delimiter){
+    std::vector<std::string> result;
+    std::string current;
+
+    for (char c : str) {
+        if (c == delimiter) {
+            result.push_back(current);
+            current.clear();
+        } else {
+            current += c;
+        }
+    }
+    result.push_back(current);  // 添加最后一个部分
+    return result;
+}
+
 std::string trim(const std::string& str){
     size_t first = str.find_first_not_of(' ');
     if (std::string::npos == first) return "";

@@ -20,40 +20,44 @@ ParsedCommand parse_command(const std::string& line){
     std::string token;
     std::vector<std::string> tokens;
 
-    // 解析第一个token（命令名）
-    if (!(ss >> token)) return cmd;
-    cmd.name = token;
+    // 分割所有token
+    while (ss >> token){
+        tokens.push_back(token);
+    }
 
-    // 处理特殊命令：show finance
-    if (cmd.name == "show" && ss >> token && token == "finance") {
+    if (tokens.empty()){
+        return cmd;
+    }
+
+    cmd.name = tokens[0];
+
+    // 处理特殊指令：show finance
+    if (cmd.name == "show" && tokens.size() > 1 && tokens[1] == "finance"){
         cmd.args.push_back("finance");
-        if (ss >> token) {
-            cmd.args.push_back(token);
+        if (tokens.size() > 2){
+            cmd.args.push_back(tokens[2]);
         }
         return cmd;
     }
 
-    // 解析剩余tokens
-    while (ss >> token) {
-        // 检查是否是选项（以-开头）
-        if (token[0] == '-') {
-            size_t equal_pos = token.find('=');
-            if (equal_pos != std::string::npos) {
-                std::string key = token.substr(1, equal_pos - 1);
-                std::string value = token.substr(equal_pos + 1);
+    // 解析其他参数
+    for (size_t i = 1; i < tokens.size(); i++){
+        std::string arg = tokens[i];
 
-                // 去除引号
-                if (value.size() >= 2 && value[0] == '"' && value.back() == '"') {
-                    value = value.substr(1, value.size() - 2);
-                }
+        // 检查是否是选项（以-开头且包含=）
+        if (arg[0] == '-' && arg.find('=') != std::string::npos){
+            size_t pos = arg.find('=');
+            std::string key = arg.substr(1, pos - 1);
+            std::string value = arg.substr(pos + 1);
 
-                cmd.options[key] = value;
-            } else {
-                // 如果不是键值对格式，作为普通参数
-                cmd.args.push_back(token);
+            // 去除引号
+            if (!value.empty() && value.front() == '"' && value.back() == '"'){
+                value = value.substr(1, value.size() - 2);
             }
+
+            cmd.options[key] = value;
         } else {
-            cmd.args.push_back(token);
+            cmd.args.push_back(arg);
         }
     }
 
@@ -126,7 +130,6 @@ bool execute(const ParsedCommand& cmd, SystemState& state){
         // 处理 show finance
         if (!cmd.args.empty() && cmd.args[0] == "finance"){
             if (state.getCurrentPrivilege() < 7) return false;
-
             int count = -1;
             if (cmd.args.size() > 1){
                 try {
@@ -135,7 +138,6 @@ bool execute(const ParsedCommand& cmd, SystemState& state){
                     return false;
                 }
             }
-
             show_finance(storage, count);
             return true;
         }
@@ -145,40 +147,41 @@ bool execute(const ParsedCommand& cmd, SystemState& state){
 
             std::vector<Book> books;
 
-            // 检查是否有参数
-            bool has_option = false;
-            for (const auto& opt : cmd.options){
-                if (!opt.second.empty()){
-                    has_option = true;
-                    break;
-                }
-            }
-
-            if (!has_option && cmd.options.empty()){
-                // 无参数：显示所有图书
+            // 如果没有选项，显示所有图书
+            if (cmd.options.empty() && cmd.args.empty()){
                 books = show_books(storage);
-            } else {
-                // 检查参数内容是否为空
-                for (const auto& opt : cmd.options){
-                    if (opt.second.empty()) return false;
-                }
+            }
+                // 如果有选项，进行筛选
+            else if (!cmd.options.empty()){
+                // 确保只有一个筛选条件
+                if (cmd.options.size() > 1) return false;
 
-                if (cmd.options.find("ISBN") != cmd.options.end()){
-                    books = show_books(storage, "ISBN", cmd.options.at("ISBN"));
-                } else if (cmd.options.find("name") != cmd.options.end()){
-                    books = show_books(storage, "name", cmd.options.at("name"));
-                } else if (cmd.options.find("author") != cmd.options.end()){
-                    books = show_books(storage, "author", cmd.options.at("author"));
-                } else if (cmd.options.find("keyword") != cmd.options.end()){
-                    books = show_books(storage, "keyword", cmd.options.at("keyword"));
+                // 获取第一个（也是唯一一个）筛选条件
+                auto it = cmd.options.begin();
+                std::string condition_type = it->first;
+                std::string condition_value = it->second;
+
+                if (condition_value.empty()) return false;
+
+                // 调用相应的筛选函数
+                if (condition_type == "ISBN"){
+                    books = show_books(storage, "ISBN", condition_value);
+                } else if (condition_type == "name"){
+                    books = show_books(storage, "name", condition_value);
+                } else if (condition_type == "author"){
+                    books = show_books(storage, "author", condition_value);
+                } else if (condition_type == "keyword"){
+                    books = show_books(storage, "keyword", condition_value);
                 } else {
-                    return false;
+                    return false; // 无效的条件类型
                 }
+            } else {
+                return false; // 没有选项也不是show all
             }
 
-            // 输出图书信息
+            // 输出结果
             if (books.empty()){
-                std::cout << std::endl;
+                std::cout << std::endl; // 无符合条件的书则输出空行
             } else {
                 for (const auto& book : books){
                     std::cout << book.isbn << "\t" << book.name << "\t" << book.author << "\t";

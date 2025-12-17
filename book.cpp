@@ -11,6 +11,10 @@ std::vector<Book> show_books(Storage& storage, const std::string& condition_type
     std::vector<Book> result;
 
     if (condition_type.empty()) {
+        // 没有筛选条件，返回所有图书（按ISBN升序）
+        std::sort(all.begin(), all.end(), [](const Book& a, const Book& b){
+            return a.isbn < b.isbn;
+        });
         return all;
     }
 
@@ -22,16 +26,19 @@ std::vector<Book> show_books(Storage& storage, const std::string& condition_type
         bool match = false;
 
         if (condition_type == "ISBN") {
+            // 精确匹配ISBN
             match = (book.isbn == condition_value);
         }
         else if (condition_type == "name") {
+            // 精确匹配书名
             match = (book.name == condition_value);
         }
         else if (condition_type == "author") {
+            // 精确匹配作者
             match = (book.author == condition_value);
         }
         else if (condition_type == "keyword") {
-            // 检查是否包含指定关键词
+            // 检查是否包含指定关键词（精确匹配）
             for (const auto& kw : book.keywords){
                 if (kw == condition_value){
                     match = true;
@@ -61,18 +68,24 @@ bool select_book(Storage& storage, SystemState& state, const std::string& isbn){
         new_book.isbn = isbn;
         new_book.name = "";
         new_book.author = "";
+        new_book.keywords.clear();
         new_book.price = 0.0;
         new_book.quantity = 0;
-        if (!storage.save_book(new_book)) return false;
+        if (!storage.save_book(new_book)) {
+            return false;
+        }
     }
     state.selected_isbn = isbn;
     return true;
 }
 bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pair<std::string, std::string>>& modifications){
-    if (state.selected_isbn.empty()) return false;
-
+    if (state.selected_isbn.empty()) {
+        return false;
+    }
     Book book = storage.load_book(state.selected_isbn);
-    if (!book.valid()) return false;
+    if (!book.valid()) {
+        return false;
+    }
 
     // 检查重复参数
     std::vector<std::string> seen_params;
@@ -81,8 +94,9 @@ bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pa
             return false;
         }
         seen_params.push_back(mod.first);
-
-        if (mod.second.empty()) return false;
+        if (mod.second.empty()) {
+            return false;
+        }
     }
 
     std::string old_isbn = book.isbn;

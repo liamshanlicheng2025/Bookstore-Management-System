@@ -9,6 +9,7 @@
 #include <cctype>
 
 std::vector<std::string> split_string(const std::string& str, char delimiter);
+std::vector<std::string> split_string_keep_empty(const std::string& str, char delimiter);
 std::string trim(const std::string& str);
 bool start_with(const std::string& str, const std::string& prefix);
 

@@ -64,27 +64,80 @@ User Storage::deserialize_user(const std::string& data){
 std::string Storage::serialize_book(const Book& book){
     std::stringstream ss;
     ss << book.isbn << "|" << book.name << "|" << book.author << "|";
+
+    // 序列化keywords，用逗号分隔
     for (size_t i = 0; i < book.keywords.size(); i++){
         if (i > 0) ss << ",";
         ss << book.keywords[i];
     }
-    ss << "|" << std::fixed << std::setprecision(2) << book.price << "|" << book.quantity;
+
+    ss << "|" << std::fixed << std::setprecision(2) << book.price
+       << "|" << book.quantity;
     return ss.str();
 }
 
 Book Storage::deserialize_book(const std::string& data){
     Book book;
-    std::vector<std::string> parts = split_string(data, '|');
+
+    // 手动解析，处理空字段
+    std::vector<std::string> parts;
+    std::string current;
+    bool in_quotes = false;
+
+    for (char c : data) {
+        if (c == '|') {
+            parts.push_back(current);
+            current.clear();
+        } else {
+            current += c;
+        }
+    }
+    // 添加最后一个部分
+    if (!current.empty()) {
+        parts.push_back(current);
+    }
+
     if (parts.size() >= 6){
         book.isbn = parts[0];
         book.name = parts[1];
         book.author = parts[2];
+
+        // 解析keywords，即使为空也要处理
         if (!parts[3].empty()){
-            std::vector<std::string> keywords = split_string(parts[3], ',');
+            std::vector<std::string> keywords;
+            std::string keyword_str = parts[3];
+            std::string keyword;
+
+            for (char c : keyword_str) {
+                if (c == ',') {
+                    if (!keyword.empty()) {
+                        keywords.push_back(keyword);
+                        keyword.clear();
+                    }
+                } else {
+                    keyword += c;
+                }
+            }
+            // 添加最后一个keyword
+            if (!keyword.empty()) {
+                keywords.push_back(keyword);
+            }
             book.keywords = keywords;
+        } else {
+            book.keywords.clear();
         }
-        book.price = std::stod(parts[4]);
-        book.quantity = std::stoi(parts[5]);
+
+        try {
+            book.price = std::stod(parts[4]);
+        } catch(...) {
+            book.price = 0.0;
+        }
+
+        try {
+            book.quantity = std::stoi(parts[5]);
+        } catch(...) {
+            book.quantity = 0;
+        }
     }
     return book;
 }
@@ -166,7 +219,9 @@ std::vector<Book> Storage::get_all_books(){
         Book book = deserialize_book(entry.second);
         if (!book.isbn.empty()) books.push_back(book);
     }
-    std::sort(books.begin(), books.end());
+    std::sort(books.begin(), books.end(), [](const Book& a, const Book& b){
+        return a.isbn < b.isbn;
+    });
     return books;
 }
 
