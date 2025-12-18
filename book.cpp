@@ -9,36 +9,28 @@
 std::vector<Book> show_books(Storage& storage, const std::string& condition_type, const std::string& condition_value){
     std::vector<Book> all = storage.get_all_books();
     std::vector<Book> result;
-
     if (condition_type.empty()) {
-        // 没有筛选条件，返回所有图书（按ISBN升序）
+        // 没有筛选条件，返回所有图书
         std::sort(all.begin(), all.end(), [](const Book& a, const Book& b){
             return a.isbn < b.isbn;
         });
         return all;
     }
-
     if (condition_value.empty()) {
         return result;
     }
-
     for (const auto& book : all){
         bool match = false;
-
         if (condition_type == "ISBN") {
-            // 精确匹配ISBN
             match = (book.isbn == condition_value);
         }
         else if (condition_type == "name") {
-            // 精确匹配书名
             match = (book.name == condition_value);
         }
         else if (condition_type == "author") {
-            // 精确匹配作者
             match = (book.author == condition_value);
         }
         else if (condition_type == "keyword") {
-            // 检查是否包含指定关键词（精确匹配）
             for (const auto& kw : book.keywords){
                 if (kw == condition_value){
                     match = true;
@@ -46,12 +38,10 @@ std::vector<Book> show_books(Storage& storage, const std::string& condition_type
                 }
             }
         }
-
         if (match) {
             result.push_back(book);
         }
     }
-
     // 按ISBN升序排序
     std::sort(result.begin(), result.end(), [](const Book& a, const Book& b){
         return a.isbn < b.isbn;
@@ -79,14 +69,9 @@ bool select_book(Storage& storage, SystemState& state, const std::string& isbn){
     return true;
 }
 bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pair<std::string, std::string>>& modifications){
-    if (state.selected_isbn.empty()) {
-        return false;
-    }
+    if (state.selected_isbn.empty()) return false;
     Book book = storage.load_book(state.selected_isbn);
-    if (!book.valid()) {
-        return false;
-    }
-
+    if (!book.valid()) return false;
     // 检查重复参数
     std::vector<std::string> seen_params;
     for (const auto& mod : modifications){
@@ -94,21 +79,15 @@ bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pa
             return false;
         }
         seen_params.push_back(mod.first);
-        if (mod.second.empty()) {
-            return false;
-        }
+        if (mod.second.empty()) return false;
     }
-
     std::string old_isbn = book.isbn;
-
     for (const auto& mod : modifications){
         std::string type = mod.first;
         std::string value = mod.second;
-
         if (type == "ISBN"){
             if (value == old_isbn) return false;
             if (!valid_isbn(value)) return false;
-
             // 检查新ISBN是否已存在
             Book existing_book = storage.load_book(value);
             if (existing_book.valid()) return false;
@@ -127,34 +106,27 @@ bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pa
             std::vector<std::string> keywords;
             std::stringstream ss(value);
             std::string item;
-
+            // 用|分割关键词，保持原始顺序
             while (std::getline(ss, item, '|')) {
                 if (item.empty()) return false;
+                // 检查重复关键词（按顺序检查，不排序）
+                if (std::find(keywords.begin(), keywords.end(), item) != keywords.end()) {
+                    return false; // 发现重复关键词
+                }
                 keywords.push_back(item);
             }
 
-            // 检查重复关键词
-            std::sort(keywords.begin(), keywords.end());
-            for (size_t i = 1; i < keywords.size(); i++) {
-                if (keywords[i] == keywords[i-1]) return false;
-            }
-
-            book.keywords = keywords;
+            book.keywords = keywords; // 保持输入顺序
         }
         else if (type == "price"){
             if (!valid_price(value)) return false;
             book.price = std::stod(value);
         }
     }
-
     // 如果ISBN改变了，需要先保存新书再删除旧书
     if (book.isbn != old_isbn){
-        // 保存新书
         if (!storage.save_book(book)) return false;
-
-        // 删除旧书
         storage.delete_book(old_isbn);
-
         // 更新选中的ISBN
         state.selected_isbn = book.isbn;
     }
@@ -162,7 +134,6 @@ bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pa
         // ISBN未改变，直接保存
         if (!storage.save_book(book)) return false;
     }
-
     return true;
 }
 bool import_book(Storage& storage, SystemState& state, int quantity, double total_cost){

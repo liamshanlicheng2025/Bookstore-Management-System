@@ -1,14 +1,19 @@
 #ifndef STORAGE_H
 #define STORAGE_H
+
 #include <string>
 #include <vector>
 #include <map>
 #include "BlockListDB.hpp"
 #include "command.h"
+#include "utils.h"
+
 struct User;
 struct Book;
 struct Transaction;
-class Storage{
+struct SystemState;
+
+class Storage {
 private:
     BlockListDB user_db;
     BlockListDB book_db;
@@ -16,7 +21,7 @@ private:
     BlockListDB finance_db;
     std::string data_dir;
 
-    //序列化与反序列化
+    // 序列化与反序列化
     std::string serialize_user(const User& user);
     User deserialize_user(const std::string& data);
     std::string serialize_book(const Book& book);
@@ -47,10 +52,10 @@ public:
     std::vector<Transaction> get_recent_transactions(int count);
 
     void update_finance(double income, double expense);
-    pair<double, double> get_finance_summary(int count = -1);
+    std::pair<double, double> get_finance_summary(int count = -1);
 
     bool save_state(const SystemState& state);
     bool load_state(SystemState& state);
 };
 
-#endif
+#endif // STORAGE_H

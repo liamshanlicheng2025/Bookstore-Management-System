@@ -1,12 +1,14 @@
 #include "storage.h"
-#include "utils.h"
 #include "user.h"
 #include "book.h"
 #include "transaction.h"
 #include <sys/stat.h>
+
 #ifdef _WIN32
 #include <direct.h>
-#define mkdir(dir, mode) _mkdir(dir)
+#define MKDIR(dir) _mkdir(dir)
+#else
+#define MKDIR(dir) mkdir(dir, 0755)
 #endif
 
 Storage::Storage() :
@@ -23,18 +25,18 @@ Storage::~Storage() {
 bool Storage::initialize(){
     struct stat st;
     if (stat("data", &st) != 0){
-        if (mkdir("data", 0755) != 0){
+        if (MKDIR("data") != 0){
             return false;
         }
     }
-
     User root = load_user("root");
-    if (root.id.empty()){
+    if (!root.valid()){
         root.id = "root";
         root.name = "manager";
         root.password = "sjtu";
         root.privilege = 7;
         if (!save_user(root)){
+            std::cerr << "Failed to create root user" << std::endl;
             return false;
         }
     }
@@ -67,7 +69,7 @@ std::string Storage::serialize_book(const Book& book){
 
     // 序列化keywords，用逗号分隔
     for (size_t i = 0; i < book.keywords.size(); i++){
-        if (i > 0) ss << ",";
+        if (i > 0) ss << "@";
         ss << book.keywords[i];
     }
 
@@ -78,12 +80,8 @@ std::string Storage::serialize_book(const Book& book){
 
 Book Storage::deserialize_book(const std::string& data){
     Book book;
-
-    // 手动解析，处理空字段
     std::vector<std::string> parts;
     std::string current;
-    bool in_quotes = false;
-
     for (char c : data) {
         if (c == '|') {
             parts.push_back(current);
@@ -96,20 +94,18 @@ Book Storage::deserialize_book(const std::string& data){
     if (!current.empty()) {
         parts.push_back(current);
     }
-
     if (parts.size() >= 6){
         book.isbn = parts[0];
         book.name = parts[1];
         book.author = parts[2];
-
-        // 解析keywords，即使为空也要处理
+        // 解析keywords，保持原始顺序
         if (!parts[3].empty()){
             std::vector<std::string> keywords;
             std::string keyword_str = parts[3];
             std::string keyword;
-
+            // 使用逗号分割，但不改变顺序
             for (char c : keyword_str) {
-                if (c == ',') {
+                if (c == '@') {
                     if (!keyword.empty()) {
                         keywords.push_back(keyword);
                         keyword.clear();
@@ -126,13 +122,11 @@ Book Storage::deserialize_book(const std::string& data){
         } else {
             book.keywords.clear();
         }
-
         try {
             book.price = std::stod(parts[4]);
         } catch(...) {
             book.price = 0.0;
         }
-
         try {
             book.quantity = std::stoi(parts[5]);
         } catch(...) {
