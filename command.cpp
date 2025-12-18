@@ -8,7 +8,7 @@
 #include <sstream>
 #include <algorithm>
 
-Storage storage;
+extern Storage storage;
 ParsedCommand parse_command(const std::string& line){
     ParsedCommand cmd;
     std::string trimmed = trim(line);

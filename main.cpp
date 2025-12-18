@@ -3,9 +3,8 @@
 #include "command.h"
 #include "storage.h"
 #include "utils.h"
-
+Storage storage;
 int main(){
-    Storage storage;
 
     if (!storage.initialize()){
         std::cerr << "Fail to initialize!" << std::endl;
