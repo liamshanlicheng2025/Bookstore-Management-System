@@ -53,12 +53,30 @@ std::string Storage::serialize_user(const User& user){
 
 User Storage::deserialize_user(const std::string& data){
     User user;
-    std::vector<std::string> parts = split_string(data, '|');
+    std::vector<std::string> parts;
+    std::string current;
+
+    for (char c : data) {
+        if (c == '|') {
+            parts.push_back(current);
+            current.clear();
+        } else {
+            current += c;
+        }
+    }
+    if (!current.empty()) {
+        parts.push_back(current);
+    }
+
     if (parts.size() >= 4){
         user.id = parts[0];
         user.name = parts[1];
         user.password = parts[2];
-        user.privilege = std::stoi(parts[3]);
+        try {
+            user.privilege = std::stoi(parts[3]);
+        } catch(...) {
+            user.privilege = 0;
+        }
     }
     return user;
 }
@@ -119,8 +137,6 @@ Book Storage::deserialize_book(const std::string& data){
                 keywords.push_back(keyword);
             }
             book.keywords = keywords;
-        } else {
-            book.keywords.clear();
         }
         try {
             book.price = std::stod(parts[4]);
@@ -163,13 +179,15 @@ Transaction Storage::deserialize_trans(const std::string& data){
 bool Storage::save_user(const User& user){
     std::string key = "user:" + user.id;
     std::string value = serialize_user(user);
-    return user_db.insert(key, value) || user_db.update(key, value);
+    return user_db.insert_or_update(key, value);
 }
 
 User Storage::load_user(const std::string& user_id){
     std::string key = "user:" + user_id;
     std::string data = user_db.find(key);
-    if (data.empty()) return User();
+    if (data.empty()) {
+        return User();
+    }
     return deserialize_user(data);
 }
 
@@ -211,8 +229,21 @@ std::vector<Book> Storage::get_all_books(){
     auto all = book_db.find_prefix("book:");
     for (const auto& entry : all){
         Book book = deserialize_book(entry.second);
-        if (!book.isbn.empty()) books.push_back(book);
+        if (!book.isbn.empty()) {
+            // 检查是否已经存在相同ISBN的书
+            bool exists = false;
+            for (const auto& existing_book : books){
+                if (existing_book.isbn == book.isbn){
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists){
+                books.push_back(book);
+            }
+        }
     }
+    // 按ISBN升序排序
     std::sort(books.begin(), books.end(), [](const Book& a, const Book& b){
         return a.isbn < b.isbn;
     });

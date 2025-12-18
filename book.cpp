@@ -82,16 +82,28 @@ bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pa
         if (mod.second.empty()) return false;
     }
     std::string old_isbn = book.isbn;
+    bool isbn_changed = false;
+    std::string new_isbn;
+    // 首先检查是否有ISBN修改
+    for (const auto& mod : modifications){
+        if (mod.first == "ISBN"){
+            if (mod.second == old_isbn) return false;
+            if (!valid_isbn(mod.second)) return false;
+
+            // 检查新ISBN是否已存在
+            Book existing_book = storage.load_book(mod.second);
+            if (existing_book.valid()) return false;
+
+            new_isbn = mod.second;
+            isbn_changed = true;
+            break;
+        }
+    }
+    // 应用所有修改
     for (const auto& mod : modifications){
         std::string type = mod.first;
         std::string value = mod.second;
         if (type == "ISBN"){
-            if (value == old_isbn) return false;
-            if (!valid_isbn(value)) return false;
-            // 检查新ISBN是否已存在
-            Book existing_book = storage.load_book(value);
-            if (existing_book.valid()) return false;
-
             book.isbn = value;
         }
         else if (type == "name"){
@@ -115,20 +127,17 @@ bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pa
                 }
                 keywords.push_back(item);
             }
-
-            book.keywords = keywords; // 保持输入顺序
+            book.keywords = keywords;
         }
         else if (type == "price"){
             if (!valid_price(value)) return false;
             book.price = std::stod(value);
         }
     }
-    // 如果ISBN改变了，需要先保存新书再删除旧书
-    if (book.isbn != old_isbn){
+    if (isbn_changed){
         if (!storage.save_book(book)) return false;
         storage.delete_book(old_isbn);
-        // 更新选中的ISBN
-        state.selected_isbn = book.isbn;
+        state.selected_isbn = new_isbn;
     }
     else {
         // ISBN未改变，直接保存

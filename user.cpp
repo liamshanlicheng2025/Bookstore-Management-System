@@ -20,20 +20,24 @@ bool register_user(Storage& storage, const std::string& user_id, const std::stri
 }
 
 bool login_user(Storage& storage, SystemState& state, const std::string& user_id, const std::string& password){
-    if (!valid_userid(user_id)) return false;
+    if (!valid_userid(user_id)) {
+        return false;
+    }
 
     User user = storage.load_user(user_id);
-    if (!user.valid()) return false;
+    if (!user.valid()) {
+        return false;
+    }
 
     if (!password.empty()){
-        // 提供了密码，需要验证密码
         if (user.password != password){
             return false;
         }
     } else {
-        // 没有提供密码，需要当前权限高于用户权限
         int current_privilege = state.getCurrentPrivilege();
-        if (current_privilege <= user.privilege) return false;
+        if (current_privilege <= user.privilege) {
+            return false;
+        }
     }
 
     state.push_login(user.id, user.privilege);
