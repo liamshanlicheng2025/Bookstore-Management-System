@@ -131,7 +131,6 @@ bool execute(const ParsedCommand& cmd, SystemState& state){
             if (cmd.options.empty() && cmd.args.empty()){
                 books = show_books(storage);
             }
-                // 如果有选项，进行筛选
             else if (!cmd.options.empty()){
                 // 确保只有一个筛选条件
                 if (cmd.options.size() > 1) return false;
@@ -139,7 +138,6 @@ bool execute(const ParsedCommand& cmd, SystemState& state){
                 std::string condition_type = it->first;
                 std::string condition_value = it->second;
                 if (condition_value.empty()) return false;
-                // 调用相应的筛选函数
                 if (condition_type == "ISBN"){
                     books = show_books(storage, "ISBN", condition_value);
                 } else if (condition_type == "name"){
@@ -149,7 +147,7 @@ bool execute(const ParsedCommand& cmd, SystemState& state){
                 } else if (condition_type == "keyword"){
                     books = show_books(storage, "keyword", condition_value);
                 } else {
-                    return false; // 无效的条件类型
+                    return false;
                 }
             } else {
                 return false;

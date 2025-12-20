@@ -2,33 +2,20 @@
 #include "user.h"
 #include "book.h"
 #include "transaction.h"
-#include <sys/stat.h>
 
-#ifdef _WIN32
-#include <direct.h>
-#define MKDIR(dir) _mkdir(dir)
-#else
-#define MKDIR(dir) mkdir(dir, 0755)
-#endif
 
 Storage::Storage() :
-        user_db("data/users.db"),
-        book_db("data/books.db"),
-        trans_db("data/transactions.db"),
-        finance_db("data/finance.db"),
-        data_dir("data") {}
+        user_db("users.db"),
+        book_db("books.db"),
+        trans_db("transactions.db"),
+        finance_db("finance.db"),
+        data_dir(".") {}
 
 Storage::~Storage() {
     cleanup();
 }
 
 bool Storage::initialize(){
-    struct stat st;
-    if (stat("data", &st) != 0){
-        if (MKDIR("data") != 0){
-            return false;
-        }
-    }
     User root = load_user("root");
     if (!root.valid()){
         root.id = "root";
@@ -55,7 +42,6 @@ User Storage::deserialize_user(const std::string& data){
     User user;
     std::vector<std::string> parts;
     std::string current;
-
     for (char c : data) {
         if (c == '|') {
             parts.push_back(current);
@@ -67,7 +53,6 @@ User Storage::deserialize_user(const std::string& data){
     if (!current.empty()) {
         parts.push_back(current);
     }
-
     if (parts.size() >= 4){
         user.id = parts[0];
         user.name = parts[1];
@@ -84,13 +69,11 @@ User Storage::deserialize_user(const std::string& data){
 std::string Storage::serialize_book(const Book& book){
     std::stringstream ss;
     ss << book.isbn << "|" << book.name << "|" << book.author << "|";
-
-    // 序列化keywords，用逗号分隔
+    // 序列化keywords，用@分隔
     for (size_t i = 0; i < book.keywords.size(); i++){
         if (i > 0) ss << "@";
         ss << book.keywords[i];
     }
-
     ss << "|" << std::fixed << std::setprecision(2) << book.price
        << "|" << book.quantity;
     return ss.str();
