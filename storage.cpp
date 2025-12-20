@@ -192,7 +192,7 @@ std::vector<User> Storage::get_all_users(){
 bool Storage::save_book(const Book& book){
     std::string key = "book:" + book.isbn;
     std::string value = serialize_book(book);
-    return book_db.insert(key, value) || book_db.update(key, value);
+    return book_db.insert_or_update(key, value);
 }
 
 Book Storage::load_book(const std::string& isbn){
@@ -340,10 +340,10 @@ bool Storage::save_state(const SystemState& state){
     for (const auto& entry : state.login_stack){
         ss << entry.user_id << " " << entry.privilege << std::endl;
     }
-    ss << state.selected_isbn << std::endl;
+    ss << state.selected_isbn << "\n";
     std::string key = "system_state";
     std::string value = ss.str();
-    return user_db.insert(key, value) || user_db.update(key, value);
+    return user_db.insert_or_update(key, value);
 }
 
 bool Storage::load_state(SystemState& state){
@@ -361,6 +361,7 @@ bool Storage::load_state(SystemState& state){
             state.login_stack.push_back(entry);
         }
     }
-    ss >> state.selected_isbn;
+    ss.ignore(1);
+    std::getline(ss, state.selected_isbn);
     return true;
 }

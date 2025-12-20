@@ -24,6 +24,7 @@ int main(){
         if (!success){
             std::cout << "Invalid" << std::endl;
         }
+        storage.save_state(state);
         if (state.should_exit){
             break;
         }

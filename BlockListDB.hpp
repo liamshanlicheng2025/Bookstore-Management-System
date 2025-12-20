@@ -108,6 +108,7 @@ private:
         data_file.write(block.first_index, INDEX_SIZE);
         data_file.write(block.last_index, INDEX_SIZE);
         data_file.write(reinterpret_cast<const char*>(block.records), sizeof(Record) * BLOCK_SIZE);
+        data_file.flush();
     }
 
     int get_end_position() {
