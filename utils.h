@@ -23,7 +23,7 @@ bool valid_price(const std::string& str);
 bool valid_quantity(const std::string& str);
 
 std::string format_double(double value);
-std::string format_time(time_t timestamp);
+std::string format_time(long long timestamp);
 
 std::string generate_id();
 std::string generate_trans_id();

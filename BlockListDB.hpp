@@ -87,10 +87,26 @@ private:
     int first_block_offset;
     vector<BlockIndexEntry> block_index;
 
+    bool linear_find_position(const string& key, int& found_block_offset, int& found_record_index) {
+        for (const auto& entry : block_index) {
+            if (entry.block_offset == -1) continue;
+            Block block = read_block(entry.block_offset);
+            for (int i = 0; i < block.record_count; i++) {
+                if (strcmp(block.records[i].index, key.c_str()) == 0) {
+                    found_block_offset = entry.block_offset;
+                    found_record_index = i;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     Block read_block(int offset) {
         Block block;
         if (offset < 0) return block;
 
+        data_file.clear();
         data_file.seekg(offset);
         data_file.read(reinterpret_cast<char*>(&block.record_count), sizeof(int));
         data_file.read(reinterpret_cast<char*>(&block.next_block), sizeof(int));
@@ -102,6 +118,7 @@ private:
     }
 
     void write_block(int offset, const Block& block) {
+        data_file.clear();
         data_file.seekp(offset);
         data_file.write(reinterpret_cast<const char*>(&block.record_count), sizeof(int));
         data_file.write(reinterpret_cast<const char*>(&block.next_block), sizeof(int));
@@ -112,6 +129,7 @@ private:
     }
 
     int get_end_position() {
+        data_file.clear();
         data_file.seekg(0, ios::end);
         return data_file.tellg();
     }
@@ -144,11 +162,13 @@ private:
     }
 
     void save_metadata() {
+        data_file.clear();
         data_file.seekp(0);
         data_file.write(reinterpret_cast<const char*>(&first_block_offset), sizeof(int));
     }
 
     void load_metadata() {
+        data_file.clear();
         data_file.seekg(0);
         if (data_file.peek() == EOF) {
             first_block_offset = create_new_block();
@@ -201,17 +221,22 @@ private:
                 strcpy(entry.last_index, block.last_index);
             }
         }
-
-        BlockIndexEntry new_entry;
-        new_entry.block_offset = new_block_offset;
-        strcpy(new_entry.first_index, new_block.first_index);
-        strcpy(new_entry.last_index, new_block.last_index);
-
-        for (auto it = block_index.begin(); it != block_index.end(); ++it) {
-            if (it->block_offset == block_offset) {
-                block_index.insert(it + 1, new_entry);
-                break;
-            }
+        // create_new_block() already appended a placeholder index entry; update and move it.
+        int new_idx = -1;
+        int old_idx = -1;
+        for (int i = 0; i < (int)block_index.size(); i++) {
+            if (block_index[i].block_offset == new_block_offset) new_idx = i;
+            if (block_index[i].block_offset == block_offset) old_idx = i;
+        }
+        if (new_idx != -1) {
+            strcpy(block_index[new_idx].first_index, new_block.first_index);
+            strcpy(block_index[new_idx].last_index, new_block.last_index);
+        }
+        if (new_idx != -1 && old_idx != -1 && new_idx != old_idx + 1) {
+            BlockIndexEntry moved = block_index[new_idx];
+            block_index.erase(block_index.begin() + new_idx);
+            if (new_idx < old_idx) old_idx--;
+            block_index.insert(block_index.begin() + old_idx + 1, moved);
         }
     }
 
@@ -363,7 +388,11 @@ public:
     bool remove(const string& key) {
         auto positions = find_record_positions(key);
         if (positions.empty()) {
-            return false;
+            int block_offset = -1, record_index = -1;
+            if (!linear_find_position(key, block_offset, record_index)) {
+                return false;
+            }
+            positions.push_back({block_offset, record_index});
         }
 
         // 从后往前删除，避免索引变化
@@ -396,13 +425,17 @@ public:
 
     string find(const string& key) {
         auto positions = find_record_positions(key);
-        if (!positions.empty()) {
-            int block_offset = positions[0].first;
-            int record_index = positions[0].second;
-            Block block = read_block(block_offset);
-            return block.records[record_index].get_value();
+        if (positions.empty()) {
+            int block_offset = -1, record_index = -1;
+            if (!linear_find_position(key, block_offset, record_index)) {
+                return "";
+            }
+            positions.push_back({block_offset, record_index});
         }
-        return "";
+        int block_offset = positions[0].first;
+        int record_index = positions[0].second;
+        Block block = read_block(block_offset);
+        return block.records[record_index].get_value();
     }
 
     vector<pair<string, string>> find_all() {
@@ -428,13 +461,6 @@ public:
 
         for (const auto& entry : block_index) {
             if (entry.block_offset == -1) continue;
-
-            if (strncmp(prefix.c_str(), entry.first_index, prefix.length()) > 0) {
-                continue;
-            }
-            if (strncmp(prefix.c_str(), entry.last_index, prefix.length()) < 0) {
-                break;
-            }
 
             Block block = read_block(entry.block_offset);
             for (int i = 0; i < block.record_count; i++) {

@@ -6,12 +6,13 @@
 struct LoginEntry{
     std::string user_id;
     int privilege;
-    LoginEntry(const std::string& id = "", int priv = 0) : user_id(id), privilege(priv) {}
+    std::string selected_isbn;
+    LoginEntry(const std::string& id = "", int priv = 0)
+        : user_id(id), privilege(priv), selected_isbn("") {}
 };
 
 struct SystemState{
     std::vector<LoginEntry> login_stack; //登录栈
-    std::string selected_isbn;
     bool should_exit;
     SystemState() : should_exit(false) {}
     int getCurrentPrivilege() const {
@@ -38,7 +39,28 @@ struct SystemState{
         return false;
     }
     void clear_selected(){
-        selected_isbn.clear();
+        if (!login_stack.empty()){
+            login_stack.back().selected_isbn.clear();
+        }
+    }
+    std::string getSelectedIsbn() const {
+        if (!login_stack.empty()){
+            return login_stack.back().selected_isbn;
+        }
+        return "";
+    }
+    void setSelectedIsbn(const std::string& isbn){
+        if (!login_stack.empty()){
+            login_stack.back().selected_isbn = isbn;
+        }
+    }
+    void updateSelectedIsbnAll(const std::string& old_isbn, const std::string& new_isbn){
+        if (old_isbn == new_isbn) return;
+        for (auto& entry : login_stack){
+            if (entry.selected_isbn == old_isbn){
+                entry.selected_isbn = new_isbn;
+            }
+        }
     }
 };
 

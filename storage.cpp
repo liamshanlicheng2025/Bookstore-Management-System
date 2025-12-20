@@ -280,7 +280,8 @@ std::vector<Transaction> Storage::get_all_transactions() {
         if (!trans.trans_id.empty()) transactions.push_back(trans);
     }
     std::sort(transactions.begin(), transactions.end(), [](const Transaction& a, const Transaction& b){
-        return a.timestamp < b.timestamp;
+        if (a.timestamp != b.timestamp) return a.timestamp < b.timestamp;
+        return a.trans_id < b.trans_id;
     });
     return transactions;
 }
@@ -310,19 +311,26 @@ void Storage::update_finance(double income, double expense){
     total_income += income;
     total_expense += expense;
     std::string new_value = to_string(total_income) + "|" + to_string(total_expense);
-    finance_db.insert("summary", new_value) || finance_db.update("summary", new_value);
+    finance_db.insert_or_update("summary", new_value);
 }
 
 std::pair<double, double> Storage::get_finance_summary(int count){
     if (count == 0){
         return make_pair(0.0, 0.0);
     }
-    std::vector<Transaction> transactions;
     if (count < 0){
-        transactions = get_all_transactions();
-    } else {
-        transactions = get_recent_transactions(count);
+        std::string current = finance_db.find("summary");
+        if (current.empty()){
+            return make_pair(0.0, 0.0);
+        }
+        std::vector<std::string> parts = split_string(current, '|');
+        if (parts.size() < 2){
+            return make_pair(0.0, 0.0);
+        }
+        return make_pair(std::stod(parts[0]), std::stod(parts[1]));
     }
+    std::vector<Transaction> transactions;
+    transactions = get_recent_transactions(count);
     double total_income = 0.0, total_expense = 0.0;
     for (const auto& trans : transactions){
         if (trans.type == "buy"){
@@ -338,9 +346,8 @@ bool Storage::save_state(const SystemState& state){
     std::stringstream ss;
     ss << state.login_stack.size() << std::endl;
     for (const auto& entry : state.login_stack){
-        ss << entry.user_id << " " << entry.privilege << std::endl;
+        ss << entry.user_id << "\t" << entry.privilege << "\t" << entry.selected_isbn << std::endl;
     }
-    ss << state.selected_isbn << "\n";
     std::string key = "system_state";
     std::string value = ss.str();
     return user_db.insert_or_update(key, value);
@@ -353,15 +360,23 @@ bool Storage::load_state(SystemState& state){
     int stack_size;
     ss >> stack_size;
     state.login_stack.clear();
+    std::string dummy;
+    std::getline(ss, dummy); // consume endline
     for (int i = 0; i < stack_size; i++){
-        std::string user_id;
-        int privilege;
-        if (ss >> user_id >> privilege){
-            LoginEntry entry = {user_id, privilege};
-            state.login_stack.push_back(entry);
+        std::string line;
+        if (!std::getline(ss, line)) break;
+        auto parts = split_string_keep_empty(line, '\t');
+        if (parts.size() < 2) continue;
+        std::string user_id = parts[0];
+        int privilege = 0;
+        try {
+            privilege = std::stoi(parts[1]);
+        } catch (...) {
+            privilege = 0;
         }
+        LoginEntry entry(user_id, privilege);
+        if (parts.size() >= 3) entry.selected_isbn = parts[2];
+        state.login_stack.push_back(entry);
     }
-    ss.ignore(1);
-    std::getline(ss, state.selected_isbn);
     return true;
 }

@@ -4,6 +4,7 @@
 #include "utils.h"
 #include <iostream>
 #include <iomanip>
+#include <cstdlib>
 
 void show_finance(Storage& storage, int count) {
     if (count == 0) {
@@ -12,6 +13,16 @@ void show_finance(Storage& storage, int count) {
     }
 
     std::pair<double, double> finance = storage.get_finance_summary(count);
+
+    const char* trace_env = std::getenv("BOOKSTORE_TRACE");
+    if (trace_env != nullptr && *trace_env != '\0') {
+        size_t trans_count = storage.get_all_transactions().size();
+        std::cerr << "[TRACE_FINANCE] count=" << count
+                  << " total_trans=" << trans_count
+                  << " income=" << format_double(finance.first)
+                  << " expense=" << format_double(finance.second)
+                  << std::endl;
+    }
 
     // 输出格式：+ [收入] - [支出]
     std::cout << "+ " << format_double(finance.first)

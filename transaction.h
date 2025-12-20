@@ -1,7 +1,7 @@
 #ifndef TRANSACTION_H
 #define TRANSACTION_H
 #include <string>
-#include <ctime>
+#include <cstdint>
 #include "storage.h"
 #include "user.h"
 
@@ -13,7 +13,7 @@ struct Transaction{
     double price;
     double total;
     std::string user_id;
-    time_t timestamp;
+    int64_t timestamp;
     Transaction() : quantity(0), price(0.0), total(0.0), timestamp(0) {}
     bool valid() const {
         return !trans_id.empty() && !isbn.empty();

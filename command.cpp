@@ -120,6 +120,10 @@ bool execute(const ParsedCommand& cmd, SystemState& state){
                     return false;
                 }
             }
+            if (count > 0){
+                int total_trans = (int)storage.get_all_transactions().size();
+                if (count > total_trans) return false;
+            }
             show_finance(storage, count);
             return true;
         }
@@ -194,7 +198,7 @@ bool execute(const ParsedCommand& cmd, SystemState& state){
     }
     else if (cmd.name == "modify"){
         if (state.getCurrentPrivilege() < 3) return false;
-        if (state.selected_isbn.empty()) return false;
+        if (state.getSelectedIsbn().empty()) return false;
         if (cmd.options.empty()) return false;
         std::vector<std::pair<std::string, std::string>> modifications;
         for (const auto& opt : cmd.options){

@@ -41,7 +41,6 @@ bool login_user(Storage& storage, SystemState& state, const std::string& user_id
     }
 
     state.push_login(user.id, user.privilege);
-    state.clear_selected();
     return true;
 }
 

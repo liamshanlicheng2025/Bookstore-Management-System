@@ -53,6 +53,7 @@ public:
 
     void update_finance(double income, double expense);
     std::pair<double, double> get_finance_summary(int count = -1);
+    int get_transaction_count();
 
     bool save_state(const SystemState& state);
     bool load_state(SystemState& state);

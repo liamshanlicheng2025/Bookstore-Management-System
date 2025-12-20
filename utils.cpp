@@ -1,5 +1,6 @@
 #include "utils.h"
 #include <cstring>
+#include <chrono>
 #include <random>
 #include <sstream>
 #include <iomanip>
@@ -111,8 +112,9 @@ std::string format_double(double value){
     return ss.str();
 }
 
-std::string format_time(time_t timestamp) {
-    tm* timeinfo = localtime(&timestamp);
+std::string format_time(long long timestamp) {
+    time_t seconds = static_cast<time_t>(timestamp / 1000000);
+    tm* timeinfo = localtime(&seconds);
     char buffer[80];
     strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
     return std::string(buffer);
@@ -124,8 +126,12 @@ std::string generate_id() {
 }
 
 std::string generate_trans_id() {
-    static int counter = 0;
-    return "TR" + std::to_string(time(nullptr)) + std::to_string(counter++);
+    using namespace std::chrono;
+    static uint64_t seq = 0;
+    auto micros = duration_cast<microseconds>(system_clock::now().time_since_epoch()).count();
+    std::ostringstream oss;
+    oss << "TR" << micros << "_" << std::setw(12) << std::setfill('0') << seq++;
+    return oss.str();
 }
 
 bool check_privilege(int required, int current){

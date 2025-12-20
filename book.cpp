@@ -5,6 +5,7 @@
 #include "utils.h"
 #include <iostream>
 #include <algorithm>
+#include <chrono>
 
 std::vector<Book> show_books(Storage& storage, const std::string& condition_type, const std::string& condition_value){
     std::vector<Book> all = storage.get_all_books();
@@ -65,12 +66,13 @@ bool select_book(Storage& storage, SystemState& state, const std::string& isbn){
             return false;
         }
     }
-    state.selected_isbn = isbn;
+    state.setSelectedIsbn(isbn);
     return true;
 }
 bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pair<std::string, std::string>>& modifications){
-    if (state.selected_isbn.empty()) return false;
-    Book book = storage.load_book(state.selected_isbn);
+    std::string selected_isbn = state.getSelectedIsbn();
+    if (selected_isbn.empty()) return false;
+    Book book = storage.load_book(selected_isbn);
     if (!book.valid()) return false;
     // 检查重复参数
     std::vector<std::string> seen_params;
@@ -137,7 +139,7 @@ bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pa
     if (isbn_changed){
         if (!storage.save_book(book)) return false;
         storage.delete_book(old_isbn);
-        state.selected_isbn = new_isbn;
+        state.updateSelectedIsbnAll(old_isbn, new_isbn);
     }
     else {
         // ISBN未改变，直接保存
@@ -147,21 +149,24 @@ bool modify_book(Storage& storage, SystemState& state, const std::vector<std::pa
 }
 bool import_book(Storage& storage, SystemState& state, int quantity, double total_cost){
     if (state.getCurrentPrivilege() < 3) return false;
-    if (state.selected_isbn.empty()) return false;
+    std::string selected_isbn = state.getSelectedIsbn();
+    if (selected_isbn.empty()) return false;
     if (quantity <= 0 || total_cost <= 0) return false;
-    Book book = storage.load_book(state.selected_isbn);
+    Book book = storage.load_book(selected_isbn);
     if (!book.valid()) return false;
     book.quantity += quantity;
     if (!storage.save_book(book)) return false;
     Transaction trans;
     trans.trans_id = generate_trans_id();
     trans.type = "import";
-    trans.isbn = state.selected_isbn;
+    trans.isbn = selected_isbn;
     trans.quantity = quantity;
     trans.price = total_cost / quantity;
     trans.total = total_cost;
     trans.user_id = state.getCurrentUserId();
-    trans.timestamp = time(nullptr);
+    trans.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
     if (!storage.save_transaction(trans)){
         book.quantity -= quantity;
         storage.save_book(book);
@@ -186,7 +191,9 @@ double buy_book(Storage& storage, SystemState& state, const std::string& isbn, i
     trans.price = book.price;
     trans.total = total;
     trans.user_id = state.getCurrentUserId();
-    trans.timestamp = time(nullptr);
+    trans.timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
     if (!storage.save_transaction(trans)){
         book.quantity += quantity;
         storage.save_book(book);
