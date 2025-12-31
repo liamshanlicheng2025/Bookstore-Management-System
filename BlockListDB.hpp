@@ -12,7 +12,7 @@
 
 using namespace std;
 
-const int BLOCK_SIZE = 16;
+const int BLOCK_SIZE = 20;
 const int INDEX_SIZE = 65;
 const int VALUE_SIZE = 1024;
 
